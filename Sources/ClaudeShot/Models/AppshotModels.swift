@@ -68,20 +68,31 @@ struct AppshotHotKey: Identifiable, Hashable, Codable {
     static let option: UInt32 = 1 << 11
     static let control: UInt32 = 1 << 12
 
+    // ⇧⌘1 by default: ⇧⌘2 collided with shortcuts people already use.
     static let defaultValue = AppshotHotKey(
-        keyCode: 19,
+        keyCode: 18,
         modifiers: command | shift,
-        keyName: "2",
-        displayName: "⇧⌘2"
+        keyName: "1",
+        displayName: "⇧⌘1"
     )
 
     static let presets: [AppshotHotKey] = [
         .defaultValue,
+        AppshotHotKey(keyCode: 19, modifiers: command | shift, keyName: "2", displayName: "⇧⌘2"),
         AppshotHotKey(keyCode: 0, modifiers: command | shift, keyName: "A", displayName: "⇧⌘A"),
         AppshotHotKey(keyCode: 0, modifiers: command | option, keyName: "A", displayName: "⌥⌘A"),
-        AppshotHotKey(keyCode: 8, modifiers: control | option, keyName: "C", displayName: "⌃⌥C"),
-        AppshotHotKey(keyCode: 9, modifiers: command | shift, keyName: "V", displayName: "⇧⌘V")
+        AppshotHotKey(keyCode: 8, modifiers: control | option, keyName: "C", displayName: "⌃⌥C")
     ]
+
+    /// "⌃⌥⇧⌘" + key, in the canonical macOS modifier order.
+    static func displayName(keyName: String, modifiers: UInt32) -> String {
+        var symbols = ""
+        if modifiers & control != 0 { symbols += "⌃" }
+        if modifiers & option != 0 { symbols += "⌥" }
+        if modifiers & shift != 0 { symbols += "⇧" }
+        if modifiers & command != 0 { symbols += "⌘" }
+        return symbols + keyName
+    }
 }
 
 extension AppshotHotKey {

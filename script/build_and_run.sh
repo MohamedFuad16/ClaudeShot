@@ -36,6 +36,23 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
+# App icon: render Assets/icon.png into an .icns so Finder / Cmd-Tab /
+# permission dialogs show the real ClaudeShot icon.
+ICON_SRC="$ROOT_DIR/Assets/icon.png"
+ICON_PLIST_KEYS=""
+if [[ -f "$ICON_SRC" ]]; then
+  ICONSET_DIR="$DIST_DIR/AppIcon.iconset"
+  rm -rf "$ICONSET_DIR"
+  mkdir -p "$ICONSET_DIR"
+  for size in 16 32 128 256 512; do
+    /usr/bin/sips -z "$size" "$size" "$ICON_SRC" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null
+    /usr/bin/sips -z "$((size * 2))" "$((size * 2))" "$ICON_SRC" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  /usr/bin/iconutil -c icns "$ICONSET_DIR" -o "$APP_RESOURCES/AppIcon.icns"
+  ICON_PLIST_KEYS="  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>"
+fi
+
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -55,6 +72,7 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$BUNDLE_VERSION</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+$ICON_PLIST_KEYS
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSHighResolutionCapable</key>

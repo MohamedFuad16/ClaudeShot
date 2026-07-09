@@ -30,12 +30,16 @@ struct PreferencesView: View {
 
                 GlassCard(title: localizer.t("settings.hotkey"), systemImage: "command") {
                     Row(label: localizer.t("settings.globalShortcut")) {
-                        Picker("", selection: hotKeyBinding) {
-                            ForEach(AppshotHotKey.presets) { preset in
-                                Text(preset.displayName).tag(preset)
+                        HStack(spacing: 10) {
+                            Picker("", selection: hotKeyBinding) {
+                                ForEach(hotKeyOptions) { option in
+                                    Text(option.displayName).tag(option)
+                                }
                             }
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+
+                            HotKeyRecorderButton(controller: controller, localizer: localizer)
                         }
-                        .labelsHidden().pickerStyle(.menu).fixedSize()
                     }
                     caption(localizer.t("settings.hotkeyCaption"))
                 }
@@ -159,9 +163,19 @@ struct PreferencesView: View {
 
     private var hotKeyBinding: Binding<AppshotHotKey> {
         Binding(
-            get: { closestPreset(for: controller.hotKey) },
+            get: { controller.hotKey },
             set: { controller.hotKey = $0 }
         )
+    }
+
+    /// Presets plus the current hotkey when it was custom-recorded, so the
+    /// picker shows what's actually registered instead of snapping to a preset.
+    private var hotKeyOptions: [AppshotHotKey] {
+        var options = AppshotHotKey.presets
+        if !options.contains(controller.hotKey) {
+            options.insert(controller.hotKey, at: 0)
+        }
+        return options
     }
 
     private var soundBinding: Binding<CaptureSound> {
@@ -172,10 +186,6 @@ struct PreferencesView: View {
                 newValue.play() // preview the chosen sound
             }
         )
-    }
-
-    private func closestPreset(for hotKey: AppshotHotKey) -> AppshotHotKey {
-        AppshotHotKey.presets.first { $0 == hotKey } ?? AppshotHotKey.presets[0]
     }
 
     private func openPrivacy(_ anchor: String) {
