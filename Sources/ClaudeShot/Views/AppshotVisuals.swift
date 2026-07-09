@@ -14,7 +14,7 @@ extension Color {
 /// of how fast the capture itself finishes.
 struct AppshotFlashView: View {
     /// Flash fade duration in seconds. Lower = faster/snappier.
-    var duration: Double = 0.45
+    var duration: Double = 0.35
     @State private var opacity: Double = 0
 
     var body: some View {
@@ -25,12 +25,7 @@ struct AppshotFlashView: View {
             .allowsHitTesting(false)
             .onAppear {
                 opacity = 0.9
-                // easeInOut, not easeOut: easeOut dumps almost all the fade into
-                // the first few frames, so a 30/60fps screen recorder catches a
-                // bright pop then a faint ghost (looks steppy on playback).
-                // easeInOut spreads the change evenly across the frames, so it
-                // reads smoothly both live and in a recording.
-                withAnimation(.easeInOut(duration: duration)) { opacity = 0 }
+                withAnimation(.easeOut(duration: duration)) { opacity = 0 }
             }
     }
 }

@@ -77,16 +77,16 @@ final class AppSettings {
     private static let defaultsVersionKey = "ClaudeShot.defaultsVersion"
 
     /// Bump when the built-in defaults change and existing installs should be
-    /// reset to them. v4 = 0.45s easeInOut flash — snappy live and smooth when
-    /// screen-recorded (0.35s easeOut sampled too few frames on a recorder).
-    private static let currentDefaultsVersion = 4
+    /// reset to them. v5 = back to the fast 0.35s easeOut flash (the preferred
+    /// live feel; use the slider toward "Smoother" when recording a demo).
+    private static let currentDefaultsVersion = 5
 
     /// Max images Claude accepts per message (reserved for future limit UI).
     let maxImages = 5
 
     static let minFlashDuration = 0.12
     static let maxFlashDuration = 0.65
-    static let defaultFlashDuration = 0.45
+    static let defaultFlashDuration = 0.35
 
     var deliveryTarget: DeliveryTarget {
         didSet {
