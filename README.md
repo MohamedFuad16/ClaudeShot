@@ -43,14 +43,6 @@ If Accessibility isn't granted, the paste step is skipped — the image is still
 
 ---
 
-## 🎬 Demo
-
-[![Watch the ClaudeShot demo on YouTube](https://img.youtube.com/vi/eiGT74FJkao/maxresdefault.jpg)](https://youtu.be/eiGT74FJkao)
-
-▶ **[Watch the demo (30s)](https://youtu.be/eiGT74FJkao)** — one hotkey grabs Safari, Finder, System Settings, Notes, and a terminal window, each pasted straight into Claude.
-
----
-
 ## ✨ Key Features
 
 ### ⌨️ Global Hotkey Capture
