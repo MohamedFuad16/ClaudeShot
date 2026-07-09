@@ -24,6 +24,14 @@ final class AppshotController {
     var capturePhase: AppshotCapturePhase = .idle
     var previewURL: URL?
     var lastMetadata: AppshotSourceMetadata?
+
+    /// Bumped every time a flash should play. The overlay keys its flash view on
+    /// this, so the flash always runs its full choreographed duration regardless
+    /// of how quickly ScreenCaptureKit returns (which is what used to make the
+    /// visible flash length feel random).
+    var flashToken = 0
+
+    @ObservationIgnored private var isShowingAccessibilityAlert = false
     var permissionMessage: String? {
         didSet {
             guard let message = permissionMessage else { return }
@@ -61,6 +69,7 @@ final class AppshotController {
     /// previewed from Settings.
     func previewFlash() {
         guard !capturePhase.isActive else { return }
+        flashToken += 1
         capturePhase = .flash
         Task { [weak self] in
             guard let self else { return }
@@ -85,6 +94,7 @@ final class AppshotController {
         permissionMessage = nil
         resetTask?.cancel()
         previewURL = nil
+        flashToken += 1
         capturePhase = .flash
 
         let target = appshotCaptureTarget(for: .frontmostWindow)
@@ -115,12 +125,46 @@ final class AppshotController {
                 self.settings.captureSound.play() // user-selectable capture sound
 
                 self.scheduleSettling(for: url)
+
+                // Without Accessibility we can't press ⌘V — the shot only reached
+                // the clipboard. Tell the user instead of failing silently.
+                if !self.injector.accessibilityTrusted {
+                    self.presentAccessibilityAlert()
+                }
             } catch {
                 guard let self else { return }
                 NSLog("ClaudeShot capture failed: \(error.localizedDescription)")
                 self.capturePhase = .idle
                 self.previewURL = nil
                 self.permissionMessage = String(format: self.localizer.t("perm.captureFailed"), error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - Accessibility prompt
+
+    /// Shows a popup when a capture was delivered but Accessibility isn't granted
+    /// (so ⌘V couldn't be pressed). Guarded so rapid captures don't stack alerts.
+    private func presentAccessibilityAlert() {
+        guard !isShowingAccessibilityAlert else { return }
+        isShowingAccessibilityAlert = true
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = localizer.t("alert.accessibilityTitle")
+        alert.informativeText = localizer.t("alert.accessibilityBody")
+        alert.addButton(withTitle: localizer.t("alert.openSettings"))
+        alert.addButton(withTitle: localizer.t("alert.later"))
+
+        let response = alert.runModal()
+        isShowingAccessibilityAlert = false
+
+        if response == .alertFirstButtonReturn {
+            // Trigger the system prompt, then open the pane so they can toggle it.
+            injector.requestAccessibilityIfNeeded()
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
             }
         }
     }

@@ -74,12 +74,18 @@ final class AppSettings {
     private static let targetKey = "ClaudeShot.deliveryTarget"
     private static let soundKey = "ClaudeShot.captureSound"
     private static let flashKey = "ClaudeShot.flashDuration"
+    private static let defaultsVersionKey = "ClaudeShot.defaultsVersion"
+
+    /// Bump when the built-in defaults change and existing installs should be
+    /// reset to them. v2 = the smoother bloom-and-fade flash.
+    private static let currentDefaultsVersion = 2
 
     /// Max images Claude accepts per message (reserved for future limit UI).
     let maxImages = 5
 
-    static let minFlashDuration = 0.12
-    static let maxFlashDuration = 0.90
+    static let minFlashDuration = 0.30
+    static let maxFlashDuration = 0.95
+    static let defaultFlashDuration = 0.55
 
     var deliveryTarget: DeliveryTarget {
         didSet {
@@ -120,7 +126,17 @@ final class AppSettings {
             captureSound = .pop
         }
 
-        let storedFlash = UserDefaults.standard.object(forKey: Self.flashKey) as? Double
-        flashDuration = storedFlash.map { min(max($0, Self.minFlashDuration), Self.maxFlashDuration) } ?? 0.45
+        // Reset the flash to the new default for installs from before the
+        // smoother-animation update (or on a fresh install).
+        let defaults = UserDefaults.standard
+        let storedVersion = defaults.integer(forKey: Self.defaultsVersionKey)
+        let storedFlash = defaults.object(forKey: Self.flashKey) as? Double
+        if storedVersion < Self.currentDefaultsVersion || storedFlash == nil {
+            flashDuration = Self.defaultFlashDuration
+            defaults.set(Self.defaultFlashDuration, forKey: Self.flashKey)
+            defaults.set(Self.currentDefaultsVersion, forKey: Self.defaultsVersionKey)
+        } else {
+            flashDuration = min(max(storedFlash!, Self.minFlashDuration), Self.maxFlashDuration)
+        }
     }
 }

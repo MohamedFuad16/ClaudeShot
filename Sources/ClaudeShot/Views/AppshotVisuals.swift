@@ -5,22 +5,42 @@ extension Color {
     static let appshotBorder = Color.white.opacity(0.14)
 }
 
-/// Full-screen camera flash: a bright white wash that pulses in and eases out,
-/// like the macOS screenshot flash. Self-animating so it never lingers white.
+/// Full-screen camera flash: a soft white bloom that rises quickly, then melts
+/// away on a smooth cubic curve — like a gentle shutter, not a hard strobe. The
+/// whole thing self-animates over `duration` via a keyframe timeline, so every
+/// flash looks identical no matter how fast the capture itself finishes.
 struct AppshotFlashView: View {
-    var duration: Double = 0.45
-    @State private var opacity: Double = 0
+    /// Total flash lifetime (bloom-in + fade-out), in seconds.
+    var duration: Double = 0.55
+    @State private var play = false
+
+    // Soft radial wash: brightest at center, feathering to the edges. Reads as
+    // a light bloom rather than a flat white-out, which is what felt "messy".
+    private var wash: some ShapeStyle {
+        RadialGradient(
+            colors: [.white, .white.opacity(0.9), .white.opacity(0.72)],
+            center: .center,
+            startRadius: 0,
+            endRadius: 1600
+        )
+    }
 
     var body: some View {
         Rectangle()
-            .fill(.white)
+            .fill(wash)
             .ignoresSafeArea()
-            .opacity(opacity)
             .allowsHitTesting(false)
-            .onAppear {
-                opacity = 0.92
-                withAnimation(.easeOut(duration: duration)) { opacity = 0 }
+            .keyframeAnimator(initialValue: 0.0, trigger: play) { view, opacity in
+                view.opacity(opacity)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    // Quick soft bloom up to peak…
+                    SpringKeyframe(0.82, duration: duration * 0.24, spring: .snappy)
+                    // …then a long, smooth cubic ease all the way back to clear.
+                    CubicKeyframe(0.0, duration: duration * 0.76)
+                }
             }
+            .onAppear { play = true }
     }
 }
 

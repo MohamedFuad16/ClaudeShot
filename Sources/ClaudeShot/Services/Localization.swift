@@ -104,6 +104,11 @@ final class Localizer {
         "target.ghostty": "Ghostty — Claude CLI",
         "settings.comingSoon": "Coming soon",
 
+        "alert.accessibilityTitle": "Accessibility permission needed",
+        "alert.accessibilityBody": "ClaudeShot captured your window and copied it to the clipboard, but it can't press ⌘V into Claude without Accessibility permission. Grant it, then your appshots will paste automatically.",
+        "alert.openSettings": "Open Accessibility Settings",
+        "alert.later": "Later",
+
         "warn.limit": "Claude accepts up to %d images per message. Send or clear the message, then reset the image count.",
         "toast.copied": "Image copied — paste into Claude with ⌘V.",
         "perm.screenDenied": "ClaudeShot needs Screen Recording permission. Enable ClaudeShot in System Settings › Privacy & Security › Screen Recording, then restart the app.",
@@ -162,6 +167,11 @@ final class Localizer {
         "target.iterm": "iTerm2 — Claude CLI",
         "target.ghostty": "Ghostty — Claude CLI",
         "settings.comingSoon": "近日公開",
+
+        "alert.accessibilityTitle": "アクセシビリティ許可が必要です",
+        "alert.accessibilityBody": "ウィンドウをキャプチャしてクリップボードにコピーしましたが、アクセシビリティ許可がないと Claude に ⌘V を送れません。許可すると、以降のアプリショットは自動で貼り付けられます。",
+        "alert.openSettings": "アクセシビリティ設定を開く",
+        "alert.later": "あとで",
 
         "warn.limit": "Claude は 1 メッセージにつき最大 %d 枚の画像を受け付けます。メッセージを送信またはクリアしてから、画像カウントをリセットしてください。",
         "toast.copied": "画像をコピーしました — ⌘V で Claude に貼り付けてください。",

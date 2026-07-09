@@ -7,9 +7,12 @@ struct CaptureOverlayView: View {
 
     var body: some View {
         ZStack {
-            if controller.capturePhase == .flash {
+            // Flash is keyed on flashToken (not the phase): each capture spins up
+            // a fresh view that runs its full choreography, so the visible flash
+            // length no longer depends on how fast the capture returns.
+            if controller.flashToken > 0 {
                 AppshotFlashView(duration: controller.settings.flashDuration)
-                    .transition(.opacity)
+                    .id(controller.flashToken)
             }
 
             VStack(alignment: .trailing, spacing: 10) {
