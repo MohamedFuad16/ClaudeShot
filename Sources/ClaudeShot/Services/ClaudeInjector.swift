@@ -75,13 +75,18 @@ final class ClaudeInjector {
         guard let app else { return nil }
         let pid = app.processIdentifier
 
-        // 1) Polite request.
+        // 1) Polite request. Kept short: under macOS 14+ cooperative
+        // activation an accessory app's activate() is often silently refused,
+        // and waiting the full budget here is the main source of paste lag.
+        // The AX raise below is what actually works, and if we still can't get
+        // frontmost the paste is posted straight to `pid` — so being impatient
+        // here is safe.
         app.activate(options: [.activateAllWindows])
-        if await waitUntilFrontmost(pid: pid, timeout: 0.8) { return pid }
+        if await waitUntilFrontmost(pid: pid, timeout: 0.4) { return pid }
 
         // 2) Accessibility: set frontmost + raise the window.
         axRaise(pid: pid)
-        if await waitUntilFrontmost(pid: pid, timeout: 0.8) { return pid }
+        if await waitUntilFrontmost(pid: pid, timeout: 0.6) { return pid }
 
         // 3) Launch Services re-open with explicit activation.
         await launch(bundleID: bundleID)
@@ -134,11 +139,17 @@ final class ClaudeInjector {
         AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
         AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
-        for _ in 0..<5 {
-            // Already good? (e.g. the user had clicked the composer earlier.)
-            if focusedElementIsTextInput(appElement) { return true }
+        // Already good? (e.g. the user had clicked the composer earlier.)
+        if focusedElementIsTextInput(appElement) { return true }
 
-            if let composer = findComposer(appElement: appElement) {
+        // Locate the composer ONCE. Walking Electron's AX tree is thousands of
+        // cross-process calls; re-walking it every retry was the dominant paste
+        // delay. Cache it and only re-walk if it wasn't there yet (lazy tree).
+        var composer = findComposer(appElement: appElement)
+
+        let attempts = 3
+        for attempt in 0..<attempts {
+            if let composer {
                 // 1) Ask nicely via AX.
                 AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                 try? await Task.sleep(nanoseconds: 90_000_000)
@@ -150,7 +161,14 @@ final class ClaudeInjector {
                     if focusedElementIsTextInput(appElement) { return true }
                 }
             }
-            try? await Task.sleep(nanoseconds: 250_000_000)
+
+            // Only pay the settle-and-retry cost when there are tries left, and
+            // only re-walk the tree if we never found the composer (Electron
+            // builds its AX tree lazily on first access).
+            if attempt < attempts - 1 {
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                if composer == nil { composer = findComposer(appElement: appElement) }
+            }
         }
         return focusedElementIsTextInput(appElement)
     }
