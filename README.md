@@ -22,6 +22,7 @@
 
 <p align="center">
   <a href="#-overview">Overview</a> •
+  <a href="#-demo">Demo</a> •
   <a href="#-key-features">Key Features</a> •
   <a href="#%EF%B8%8F-how-it-works">How It Works</a> •
   <a href="#-installation">Installation</a> •
@@ -39,6 +40,14 @@
 Press the global hotkey (**⇧⌘1** by default — or record your own) anywhere on your Mac and ClaudeShot captures the **frontmost window** via ScreenCaptureKit, plays a polished flash → landing → settling animation, copies the PNG to your clipboard, then brings Claude forward and synthesizes **⌘V** into its composer. The screenshot lands in Claude before you've let go of the keys.
 
 If Accessibility isn't granted, the paste step is skipped — the image is still on your clipboard, so you just click Claude's composer and press ⌘V yourself.
+
+---
+
+## 🎬 Demo
+
+[![Watch the ClaudeShot demo on YouTube](https://img.youtube.com/vi/eiGT74FJkao/maxresdefault.jpg)](https://youtu.be/eiGT74FJkao)
+
+▶ **[Watch the demo (30s)](https://youtu.be/eiGT74FJkao)** — one hotkey grabs Safari, Finder, System Settings, Notes, and a terminal window, each pasted straight into Claude.
 
 ---
 
