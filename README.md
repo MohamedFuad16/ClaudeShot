@@ -149,7 +149,6 @@ Two rough edges I'm still working on — documented honestly:
 1. **Paste can miss when the composer was never focused.** If you fire the hotkey from another app while Claude's input box has never been clicked, the screenshot is captured but may not land in the composer. Claude Desktop is an Electron/Chromium app that builds its accessibility tree lazily and often ignores programmatic focus, so the synthesized ⌘V can land nowhere. ClaudeShot mitigates this with an AX raise + a synthesized click on the composer + posting ⌘V straight to Claude's pid — but it's not yet 100%. The image is always on your clipboard as a fallback.
 2. **Claude's 5-images-per-message limit.** Claude Desktop accepts up to **5 images** per message. Beyond that, ClaudeShot still captures and shows the thumbnail (bottom-right), but the image only goes to your **clipboard** — paste it manually with ⌘V. Count-aware handling is on the roadmap.
 
-📝 **Write-up:** the story behind ClaudeShot (and the trick I used to reverse-engineer the Appshot animation by feeding *video frames* to Claude) is in [`docs/qiita-article.ja.md`](docs/qiita-article.ja.md).
 
 ---
 
