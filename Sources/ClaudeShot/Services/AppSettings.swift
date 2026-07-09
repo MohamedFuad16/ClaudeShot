@@ -77,15 +77,16 @@ final class AppSettings {
     private static let defaultsVersionKey = "ClaudeShot.defaultsVersion"
 
     /// Bump when the built-in defaults change and existing installs should be
-    /// reset to them. v2 = the smoother bloom-and-fade flash.
-    private static let currentDefaultsVersion = 2
+    /// reset to them. v3 = fast, GPU-cheap opacity flash (the v2 gradient/keyframe
+    /// version stuttered and felt slow).
+    private static let currentDefaultsVersion = 3
 
     /// Max images Claude accepts per message (reserved for future limit UI).
     let maxImages = 5
 
-    static let minFlashDuration = 0.30
-    static let maxFlashDuration = 0.95
-    static let defaultFlashDuration = 0.55
+    static let minFlashDuration = 0.12
+    static let maxFlashDuration = 0.65
+    static let defaultFlashDuration = 0.35
 
     var deliveryTarget: DeliveryTarget {
         didSet {

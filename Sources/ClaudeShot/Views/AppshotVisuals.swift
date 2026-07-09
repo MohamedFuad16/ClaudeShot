@@ -5,42 +5,28 @@ extension Color {
     static let appshotBorder = Color.white.opacity(0.14)
 }
 
-/// Full-screen camera flash: a soft white bloom that rises quickly, then melts
-/// away on a smooth cubic curve — like a gentle shutter, not a hard strobe. The
-/// whole thing self-animates over `duration` via a keyframe timeline, so every
-/// flash looks identical no matter how fast the capture itself finishes.
+/// Full-screen camera flash: a bright white pop that eases straight out, like
+/// the macOS screenshot flash. Deliberately a **solid fill + pure opacity** so
+/// Core Animation drives it on the GPU with no per-frame redraw — that's what
+/// keeps it buttery. (An animated full-screen gradient re-rasterizes every
+/// frame and stutters; don't reintroduce one here.) The overlay keys this view
+/// on the capture's flashToken, so it always plays its full duration regardless
+/// of how fast the capture itself finishes.
 struct AppshotFlashView: View {
-    /// Total flash lifetime (bloom-in + fade-out), in seconds.
-    var duration: Double = 0.55
-    @State private var play = false
-
-    // Soft radial wash: brightest at center, feathering to the edges. Reads as
-    // a light bloom rather than a flat white-out, which is what felt "messy".
-    private var wash: some ShapeStyle {
-        RadialGradient(
-            colors: [.white, .white.opacity(0.9), .white.opacity(0.72)],
-            center: .center,
-            startRadius: 0,
-            endRadius: 1600
-        )
-    }
+    /// Flash fade duration in seconds. Lower = faster/snappier.
+    var duration: Double = 0.35
+    @State private var opacity: Double = 0
 
     var body: some View {
         Rectangle()
-            .fill(wash)
+            .fill(.white)
             .ignoresSafeArea()
+            .opacity(opacity)
             .allowsHitTesting(false)
-            .keyframeAnimator(initialValue: 0.0, trigger: play) { view, opacity in
-                view.opacity(opacity)
-            } keyframes: { _ in
-                KeyframeTrack {
-                    // Quick soft bloom up to peak…
-                    SpringKeyframe(0.82, duration: duration * 0.24, spring: .snappy)
-                    // …then a long, smooth cubic ease all the way back to clear.
-                    CubicKeyframe(0.0, duration: duration * 0.76)
-                }
+            .onAppear {
+                opacity = 0.9
+                withAnimation(.easeOut(duration: duration)) { opacity = 0 }
             }
-            .onAppear { play = true }
     }
 }
 
