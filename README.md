@@ -1,7 +1,15 @@
+<p align="center">
+  <img src="Assets/icon.png" alt="ClaudeShot" width="120" height="120"/>
+</p>
+
 <h1 align="center">ClaudeShot</h1>
 
 <p align="center">
   <strong>A native macOS menu bar helper that screenshots the frontmost window and pastes it straight into Claude — with one global hotkey.</strong>
+</p>
+
+<p align="center">
+  <strong>English</strong> · <a href="README.ja.md">日本語</a>
 </p>
 
 <p align="center">
@@ -28,7 +36,7 @@
 
 **ClaudeShot** ports Agent Swarm's **Appshot** capture toolkit and wires it into the **Claude desktop app** (`com.anthropic.claudefordesktop`). It runs as a background **menu-bar accessory** — no Dock icon, negligible footprint, zero external dependencies.
 
-Press the global hotkey (**⇧⌘2** by default) anywhere on your Mac and ClaudeShot captures the **frontmost window** via ScreenCaptureKit, plays a polished flash → landing → settling animation, copies the PNG to your clipboard, then brings Claude forward and synthesizes **⌘V** into its composer. The screenshot lands in Claude before you've let go of the keys.
+Press the global hotkey (**⇧⌘1** by default — or record your own) anywhere on your Mac and ClaudeShot captures the **frontmost window** via ScreenCaptureKit, plays a polished flash → landing → settling animation, copies the PNG to your clipboard, then brings Claude forward and synthesizes **⌘V** into its composer. The screenshot lands in Claude before you've let go of the keys.
 
 If Accessibility isn't granted, the paste step is skipped — the image is still on your clipboard, so you just click Claude's composer and press ⌘V yourself.
 
@@ -38,7 +46,7 @@ If Accessibility isn't granted, the paste step is skipped — the image is still
 
 ### ⌨️ Global Hotkey Capture
 - System-wide Carbon hotkey fires from **any** app, not just when ClaudeShot is focused.
-- Default **⇧⌘2**, with presets for **⇧⌘A**, **⌥⌘A**, **⌃⌥C**, and **⇧⌘V** — pick one in Preferences and it's persisted across launches.
+- Default **⇧⌘1**, with presets for **⇧⌘2**, **⇧⌘A**, **⌥⌘A**, and **⌃⌥C** — or hit **Record Shortcut…** and press any combination of your own (⌘/⌃/⌥ required so it can't fire mid-typing; Esc cancels). Your choice is persisted across launches.
 - Also available as a menu item (**Take Appshot**) for mouse-only use.
 
 ### 📸 Frontmost-Window Screenshots
@@ -73,7 +81,7 @@ If Accessibility isn't granted, the paste step is skipped — the image is still
 The SwiftUI menu-bar app orchestrates capture and delivery entirely through native macOS system APIs:
 
 ```
-[ Global Hotkey ⇧⌘2 ]  ──or──  [ Menu ▸ Take Appshot ]
+[ Global Hotkey ⇧⌘1 ]  ──or──  [ Menu ▸ Take Appshot ]
        │
        ├─► [1] Resolve the frontmost window (ScreenCaptureKit + source metadata)
        ├─► [2] Play flash pulse, capture at native Retina scale → PNG
@@ -134,6 +142,17 @@ Because a real, signed `.app` bundle is installed into `/Applications`, both per
 
 ---
 
+## ⚠️ Known Limitations
+
+Two rough edges I'm still working on — documented honestly:
+
+1. **Paste can miss when the composer was never focused.** If you fire the hotkey from another app while Claude's input box has never been clicked, the screenshot is captured but may not land in the composer. Claude Desktop is an Electron/Chromium app that builds its accessibility tree lazily and often ignores programmatic focus, so the synthesized ⌘V can land nowhere. ClaudeShot mitigates this with an AX raise + a synthesized click on the composer + posting ⌘V straight to Claude's pid — but it's not yet 100%. The image is always on your clipboard as a fallback.
+2. **Claude's 5-images-per-message limit.** Claude Desktop accepts up to **5 images** per message. Beyond that, ClaudeShot still captures and shows the thumbnail (bottom-right), but the image only goes to your **clipboard** — paste it manually with ⌘V. Count-aware handling is on the roadmap.
+
+📝 **Write-up:** the story behind ClaudeShot (and the trick I used to reverse-engineer the Appshot animation by feeding *video frames* to Claude) is in [`docs/qiita-article.ja.md`](docs/qiita-article.ja.md).
+
+---
+
 ## 🛠️ Development
 
 Built entirely in Swift with **zero external dependencies** — no CocoaPods, no third-party SPM packages, just Apple frameworks compiled by SwiftPM.
@@ -165,6 +184,7 @@ Sources/ClaudeShot/
 │   └── AppshotModels.swift         — Source metadata, hotkey presets
 └── Views/
     ├── PreferencesView.swift       — Hotkey, sound, flash, language, permissions
+    ├── HotKeyRecorderButton.swift  — "Record Shortcut…" custom key-combo capture
     ├── AppshotVisuals.swift        — Animated capture visuals
     ├── CapturePanel.swift          — Floating overlay panel
     ├── CaptureOverlayView.swift    — Capture overlay rendering
