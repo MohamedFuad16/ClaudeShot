@@ -316,7 +316,11 @@ final class ClaudeInjector {
 
     private func collectTextInputs(in element: AXUIElement, depth: Int, visited: inout Int, into inputs: inout [AXUIElement]) {
         // Bounded search: Chromium AX trees nest deeply and can be huge.
-        guard depth < 24, visited < 2500, inputs.count < 8 else { return }
+        // Claude Desktop's composer currently sits at depth ~27, so the cap
+        // must stay well above that — 24 silently missed it entirely (found
+        // 0 inputs → every paste fell through to clipboard-only). The visited
+        // budget is the real backstop against a pathological tree.
+        guard depth < 60, visited < 4000, inputs.count < 8 else { return }
         visited += 1
 
         if isTextInput(element) {
