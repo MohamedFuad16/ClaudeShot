@@ -167,12 +167,26 @@ final class AppshotController {
         case .pasted, .superseded:
             break
         case .limitReached:
-            permissionMessage = localizer.t("warn.limit", settings.maxImages)
+            presentPermissionCard(localizer.t("warn.limit", settings.maxImages))
         case .clipboardOnly:
-            permissionMessage = localizer.t("toast.copied")
+            presentPermissionCard(localizer.t("toast.copied"))
         case .appUnavailable:
-            permissionMessage = localizer.t("warn.noTarget")
+            presentPermissionCard(localizer.t("warn.noTarget"))
         }
+    }
+
+    /// Presents a warning card as the sole, stable overlay. The preview
+    /// thumbnail is set optimistically before delivery finishes, so on a
+    /// failure the card would otherwise flash in *after* a (misleading)
+    /// "landed" thumbnail and then get cut short when the settle machine
+    /// resets the overlay. Tear that choreography down and drop the thumbnail
+    /// so nothing was added visually, and the card owns the corner for its
+    /// full dismiss interval.
+    private func presentPermissionCard(_ message: String) {
+        resetTask?.cancel()
+        previewURL = nil
+        capturePhase = .idle
+        permissionMessage = message
     }
 
     // MARK: - Accessibility prompt
