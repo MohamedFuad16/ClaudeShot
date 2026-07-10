@@ -15,6 +15,10 @@ private struct AppshotCaptureTarget {
     var metadata: AppshotSourceMetadata
 }
 
+private struct AppshotCaptureTimeoutError: LocalizedError {
+    var errorDescription: String? { "screen capture timed out" }
+}
+
 /// Drives the appshot capture pipeline and the flash → landing → settling →
 /// ready animation phases. Ported from Agent Swarm's SwarmStore, trimmed to
 /// just the screenshot concern and wired to ClaudeBridge instead of a chat.
@@ -32,12 +36,18 @@ final class AppshotController {
     var flashToken = 0
 
     @ObservationIgnored private var isShowingAccessibilityAlert = false
+    @ObservationIgnored private var hasShownAccessibilityAlert = false
+    @ObservationIgnored private var messageDismissTask: Task<Void, Never>?
     var permissionMessage: String? {
         didSet {
-            guard let message = permissionMessage else { return }
-            Task { [weak self] in
+            // Cancel the previous timer so re-showing the same text doesn't
+            // get dismissed early by a stale timer (string-equality race).
+            messageDismissTask?.cancel()
+            guard permissionMessage != nil else { return }
+            messageDismissTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 7_000_000_000)
-                if self?.permissionMessage == message { self?.permissionMessage = nil }
+                guard !Task.isCancelled else { return }
+                self?.permissionMessage = nil
             }
         }
     }
@@ -115,16 +125,23 @@ final class AppshotController {
                 )
                 guard let self else { return }
 
-                // Always copy to clipboard and auto-paste. (Image-count limit
-                // handling was removed for now — to be reintroduced later.)
-                self.injector.deliver(pngData: pngData, to: self.settings.deliveryTarget, autoPaste: true)
-
                 self.previewURL = url
                 self.lastMetadata = metadata
                 self.capturePhase = .landing
                 self.settings.captureSound.play() // user-selectable capture sound
 
                 self.scheduleSettling(for: url)
+
+                // Deliver (clipboard + verified auto-paste) and surface the
+                // outcome instead of assuming success: an unfocused composer
+                // or Claude's per-message image limit used to fail silently.
+                let outcome = await self.injector.deliver(
+                    pngData: pngData,
+                    to: self.settings.deliveryTarget,
+                    autoPaste: true,
+                    maxImages: self.settings.maxImages
+                )
+                self.handleDeliveryOutcome(outcome)
 
                 // Without Accessibility we can't press ⌘V — the shot only reached
                 // the clipboard. Tell the user instead of failing silently.
@@ -141,13 +158,32 @@ final class AppshotController {
         }
     }
 
+    // MARK: - Delivery outcome
+
+    /// Branches the user-visible feedback on what actually happened, so the
+    /// UI never celebrates a paste that only reached the clipboard.
+    private func handleDeliveryOutcome(_ outcome: DeliveryOutcome) {
+        switch outcome {
+        case .pasted, .superseded:
+            break
+        case .limitReached:
+            permissionMessage = localizer.t("warn.limit", settings.maxImages)
+        case .clipboardOnly:
+            permissionMessage = localizer.t("toast.copied")
+        case .appUnavailable:
+            permissionMessage = localizer.t("warn.noTarget")
+        }
+    }
+
     // MARK: - Accessibility prompt
 
     /// Shows a popup when a capture was delivered but Accessibility isn't granted
-    /// (so ⌘V couldn't be pressed). Guarded so rapid captures don't stack alerts.
+    /// (so ⌘V couldn't be pressed). Shown once per launch so every capture
+    /// doesn't steal focus with a modal.
     private func presentAccessibilityAlert() {
-        guard !isShowingAccessibilityAlert else { return }
+        guard !isShowingAccessibilityAlert, !hasShownAccessibilityAlert else { return }
         isShowingAccessibilityAlert = true
+        hasShownAccessibilityAlert = true
 
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
@@ -192,7 +228,25 @@ final class AppshotController {
     private static func captureDirectory() throws -> URL {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeShot", isDirectory: true)
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        sweepOldCaptures(in: base)
         return base
+    }
+
+    /// Retina PNGs are multi-MB each; without a sweep the temp folder grows
+    /// forever. Shots older than a day are no longer previewable anyway.
+    private static func sweepOldCaptures(in directory: URL) {
+        let fileManager = FileManager.default
+        guard let files = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+        let cutoff = Date().addingTimeInterval(-86_400)
+        for file in files {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified < cutoff {
+                try? fileManager.removeItem(at: file)
+            }
+        }
     }
 
     nonisolated private static func captureAppshot(
@@ -201,7 +255,20 @@ final class AppshotController {
         displayID: CGDirectDisplayID?,
         scaleFactor: CGFloat
     ) async throws -> (URL, Data) {
-        let image = try await captureScreenImage(windowID: windowID, displayID: displayID, scaleFactor: scaleFactor)
+        // Bounded: a hung ScreenCaptureKit call used to leave capturePhase
+        // stuck in .flash forever, bricking the hotkey until app restart.
+        let image = try await withThrowingTaskGroup(of: CGImage.self) { group in
+            group.addTask {
+                try await captureScreenImage(windowID: windowID, displayID: displayID, scaleFactor: scaleFactor)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 6_000_000_000)
+                throw AppshotCaptureTimeoutError()
+            }
+            guard let first = try await group.next() else { throw AppshotCaptureTimeoutError() }
+            group.cancelAll()
+            return first
+        }
         let data = try writePNG(image, to: destination)
         return (destination, data)
     }
@@ -236,13 +303,18 @@ final class AppshotController {
         }
         configuration.width = max(Int(CGFloat(display.width) * scale), 1)
         configuration.height = max(Int(CGFloat(display.height) * scale), 1)
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        // Exclude our own windows: the flash overlay is already on screen by
+        // the time a display capture renders, and used to wash out the shot.
+        let ownApps = content.applications.filter { $0.processID == getpid() }
+        let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
         return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
     }
 
     nonisolated private static func writePNG(_ image: CGImage, to destination: URL) throws -> Data {
-        guard let imageDestination = CGImageDestinationCreateWithURL(
-            destination as CFURL,
+        // Encode once in memory, then persist — avoids re-reading the file.
+        let data = NSMutableData()
+        guard let imageDestination = CGImageDestinationCreateWithData(
+            data as CFMutableData,
             UTType.png.identifier as CFString,
             1,
             nil
@@ -253,7 +325,9 @@ final class AppshotController {
         guard CGImageDestinationFinalize(imageDestination) else {
             throw CocoaError(.fileWriteUnknown)
         }
-        return try Data(contentsOf: destination)
+        let pngData = data as Data
+        try pngData.write(to: destination)
+        return pngData
     }
 
     // MARK: - Targeting
@@ -262,7 +336,9 @@ final class AppshotController {
     /// that display's factor; for a window, the densest attached screen
     /// (windows can straddle displays, so err on the sharp side).
     private func captureScaleFactor(for target: AppshotCaptureTarget) -> CGFloat {
-        if let displayID = target.displayID {
+        // Window targets keep the densest-screen factor even though they now
+        // carry a fallback displayID — the window may sit on another display.
+        if target.windowID == nil, let displayID = target.displayID {
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             for screen in NSScreen.screens {
                 if let number = screen.deviceDescription[key] as? NSNumber,
@@ -312,7 +388,14 @@ final class AppshotController {
                 bundleIdentifier: runningApp?.bundleIdentifier,
                 processIdentifier: processID
             )
-            candidates.append(AppshotCaptureTarget(windowID: CGWindowID(number), displayID: nil, metadata: metadata))
+            // Carry the pointer's display so that if this window vanishes
+            // before the ScreenCaptureKit lookup, the fallback captures the
+            // display the user is on — not an arbitrary first display.
+            candidates.append(AppshotCaptureTarget(
+                windowID: CGWindowID(number),
+                displayID: activeDisplayIDUnderPointer(),
+                metadata: metadata
+            ))
         }
         return candidates.first { $0.metadata.processIdentifier != currentProcessID } ?? candidates.first
     }
