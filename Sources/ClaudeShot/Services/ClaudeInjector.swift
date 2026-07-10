@@ -83,14 +83,18 @@ final class ClaudeInjector {
 
         // Pre-flight the per-message image limit before touching the keyboard.
         let baseline = composerSnapshot(near: composer)
+        let isFront = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        NSLog("ClaudeShot: composer focused; baseline images=\(baseline.images) nodes=\(baseline.nodes); claudeFrontmost=\(isFront)")
         if baseline.images >= maxImages {
             NSLog("ClaudeShot: composer already has \(baseline.images) image(s); limit is \(maxImages)")
             return .limitReached(count: baseline.images)
         }
 
-        if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid {
+        if isFront {
             postCommandV()
             if await waitForAttachment(near: composer, baseline: baseline, timeout: 1.5) {
+                let after = composerSnapshot(near: composer)
+                NSLog("ClaudeShot: ⌘V verified; after images=\(after.images) nodes=\(after.nodes)")
                 return .pasted
             }
             // No menu-paste retry here: if ⌘V landed but verification missed
@@ -298,8 +302,10 @@ final class ClaudeInjector {
         var inputs: [AXUIElement] = []
         var visited = 0
         collectTextInputs(in: window, depth: 0, visited: &visited, into: &inputs)
-        NSLog("ClaudeShot: found \(inputs.count) text input(s) in target window")
+        // Only log a hit: this runs on a tight poll while Electron lazily
+        // materializes its AX tree, so logging every empty pass floods the log.
         guard !inputs.isEmpty else { return nil }
+        NSLog("ClaudeShot: found \(inputs.count) text input(s) in target window")
 
         if let windowFrame = frame(of: window) {
             let plausible = inputs.filter { input in
@@ -441,14 +447,44 @@ final class ClaudeInjector {
         return ComposerSnapshot(images: images, nodes: visited)
     }
 
+    /// Recognizes a description that names a pasted image file (e.g.
+    /// "image.png"). Filenames are not localized, so this stays correct in
+    /// every UI language — unlike matching the "Remove …" button label.
+    private func looksLikeImageFilename(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        for ext in [".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".tif", ".tiff", ".bmp"]
+        where lower.hasSuffix(ext) || lower.contains(ext + " ") || lower.contains(ext + "\u{00A0}") {
+            return true
+        }
+        return false
+    }
+
+    /// Counts attachment chips in the composer area. Claude Desktop exposes a
+    /// pasted image NOT as an AXImage but as an AXCheckBox whose description is
+    /// the filename ("image.png"), paired with a "Remove …" AXButton — so the
+    /// old AXImage-only count was always 0, which silently defeated both the
+    /// per-message limit check and paste verification. We count the filename
+    /// checkbox (one per attachment) and still honor AXImage for other targets
+    /// and future Claude builds. The paired Remove button is deliberately not
+    /// counted, so each attachment contributes exactly one.
     private func countImages(in element: AXUIElement, depth: Int, visited: inout Int, count: inout Int) {
         guard depth < 12, visited < 600 else { return }
         visited += 1
         var roleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
-           (roleRef as? String) == kAXImageRole as String {
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        let role = roleRef as? String
+
+        if role == kAXImageRole as String {
             count += 1
             return // attachment thumbnails don't nest further images
+        }
+        if role == kAXCheckBoxRole as String {
+            var descRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef)
+            if let desc = descRef as? String, looksLikeImageFilename(desc) {
+                count += 1
+                return
+            }
         }
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
@@ -458,18 +494,21 @@ final class ClaudeInjector {
         }
     }
 
-    /// Polls until the composer area shows a new image (or grows at all — the
-    /// chip adds nodes even if its thumbnail isn't exposed as AXImage), or
-    /// times out.
+    /// Polls until the composer area shows a new attachment. Primary signal is
+    /// the accurate attachment count; a node-count jump is kept only as a
+    /// fallback and requires a meaningful delta (an attachment chip adds ~7
+    /// nodes) so incidental re-render churn can't fake a successful paste.
+    private func attachmentAppeared(_ now: ComposerSnapshot, vs baseline: ComposerSnapshot) -> Bool {
+        now.images > baseline.images || now.nodes >= baseline.nodes + 4
+    }
+
     private func waitForAttachment(near composer: AXUIElement, baseline: ComposerSnapshot, timeout: TimeInterval) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            let now = composerSnapshot(near: composer)
-            if now.images > baseline.images || now.nodes > baseline.nodes { return true }
+            if attachmentAppeared(composerSnapshot(near: composer), vs: baseline) { return true }
             try? await Task.sleep(nanoseconds: 120_000_000)
         }
-        let now = composerSnapshot(near: composer)
-        return now.images > baseline.images || now.nodes > baseline.nodes
+        return attachmentAppeared(composerSnapshot(near: composer), vs: baseline)
     }
 
     // MARK: - Paste
