@@ -55,7 +55,6 @@ final class Localizer {
         "menu.takeAppshot": "Take Appshot",
         "menu.preferences": "Preferences…",
         "menu.grantAccessibility": "Grant Accessibility Permission…",
-        "menu.resetCount": "Reset Image Count",
         "menu.quit": "Quit ClaudeShot",
 
         "phase.capturing": "Capturing appshot",
@@ -109,8 +108,9 @@ final class Localizer {
         "alert.openSettings": "Open Accessibility Settings",
         "alert.later": "Later",
 
-        "warn.limit": "Claude accepts up to %d images per message. Send or clear the message, then reset the image count.",
-        "toast.copied": "Image copied — paste into Claude with ⌘V.",
+        "warn.limit": "Claude already has %d images in this message — the shot was copied instead. Send or clear the message in Claude, then press ⌘V.",
+        "toast.copied": "Couldn't auto-paste — the image is on your clipboard. Click Claude's message box and press ⌘V.",
+        "warn.noTarget": "Couldn't find or launch the Claude app. The image is on your clipboard — press ⌘V once Claude is open.",
         "perm.screenDenied": "ClaudeShot needs Screen Recording permission. Enable ClaudeShot in System Settings › Privacy & Security › Screen Recording, then restart the app.",
         "perm.captureFailed": "Couldn't capture the appshot: %@",
     ]
@@ -119,7 +119,6 @@ final class Localizer {
         "menu.takeAppshot": "アプリショットを撮る",
         "menu.preferences": "環境設定…",
         "menu.grantAccessibility": "アクセシビリティ許可を付与…",
-        "menu.resetCount": "画像カウントをリセット",
         "menu.quit": "ClaudeShot を終了",
 
         "phase.capturing": "アプリショットを撮影中",
@@ -173,8 +172,9 @@ final class Localizer {
         "alert.openSettings": "アクセシビリティ設定を開く",
         "alert.later": "あとで",
 
-        "warn.limit": "Claude は 1 メッセージにつき最大 %d 枚の画像を受け付けます。メッセージを送信またはクリアしてから、画像カウントをリセットしてください。",
-        "toast.copied": "画像をコピーしました — ⌘V で Claude に貼り付けてください。",
+        "warn.limit": "このメッセージにはすでに %d 枚の画像があるため、クリップボードにコピーしました。Claude でメッセージを送信またはクリアしてから ⌘V を押してください。",
+        "toast.copied": "自動貼り付けできませんでした — 画像はクリップボードにあります。Claude の入力欄をクリックして ⌘V を押してください。",
+        "warn.noTarget": "Claude アプリが見つからないか起動できませんでした。画像はクリップボードにあります — Claude を開いて ⌘V を押してください。",
         "perm.screenDenied": "ClaudeShot には画面収録の許可が必要です。システム設定 › プライバシーとセキュリティ › 画面収録 で ClaudeShot を有効にし、アプリを再起動してください。",
         "perm.captureFailed": "アプリショットをキャプチャできませんでした: %@",
     ]
